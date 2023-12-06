@@ -9,11 +9,13 @@ import os
 import tarfile
 import hashlib
 
+
 def calculate_sha256_checksum(fileobj):
     sha256_hash = hashlib.sha256()
     for byte_block in iter(lambda: fileobj.read(4096), b""):
         sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
+
 
 def exec_cmd(cmd):
     print("Running: %s" % " ".join(cmd))
@@ -23,26 +25,29 @@ def exec_cmd(cmd):
         print("Error: %s" % err)
         sys.exit(1)
 
+
 def drop_algo(digest):
     return digest.split(":")[1]
+
 
 def process_tar(path):
     layer = {}
     with tarfile.open(path) as tar:
         while True:
             t = tar.next()
-            if t == None:
+            if t is None:
                 break
             if t.isfile():
                 f = tar.extractfile(t)
                 checksum = calculate_sha256_checksum(f)
                 layer[checksum] = {
-                    "path" : t.path,
-                    "offset" : t.offset,
-                    "size" : t.size,
-                    "checksum" : checksum
+                    "path": t.path,
+                    "offset": t.offset,
+                    "size": t.size,
+                    "checksum": checksum
                 }
     return layer
+
 
 def find_best_matching_layer(src_layers, dest_layer):
     best_layer = None
@@ -57,17 +62,31 @@ def find_best_matching_layer(src_layers, dest_layer):
             best_layer = i
     return best_layer
 
+
 def create_delta(src, dest, directory):
     os.mkdir(directory)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         src_exploded = tempfile.TemporaryDirectory(dir=tmpdir)
-        exec_cmd(["podman", "push", "--force-compression",  "--compress=false", src, "dir:%s" % src_exploded.name])
-        dest_exploded = tempfile.TemporaryDirectory(dir=tmpdir)
-        exec_cmd(["podman", "push", "--force-compression",  "--compress=false", dest, "dir:%s" % dest_exploded.name])
+        exec_cmd(
+                ["podman",
+                 "push",
+                 "--force-compression",
+                 "--compress=false",
+                 src, "dir:%s" % src_exploded.name])
 
-        src_manifest = json.load(open(os.path.join(src_exploded.name, "manifest.json")))
-        dest_manifest = json.load(open(os.path.join(dest_exploded.name, "manifest.json")))
+        dest_exploded = tempfile.TemporaryDirectory(dir=tmpdir)
+        exec_cmd(
+                ["podman",
+                 "push",
+                 "--force-compression",
+                 "--compress=false",
+                 dest, "dir:%s" % dest_exploded.name])
+
+        src_manifest = json.load(
+                open(os.path.join(src_exploded.name, "manifest.json")))
+        dest_manifest = json.load(
+                open(os.path.join(dest_exploded.name, "manifest.json")))
 
         src_layers = {}
         for i in src_manifest["layers"]:
@@ -76,9 +95,10 @@ def create_delta(src, dest, directory):
             src_layers[drop_algo(i["digest"])] = src_layer
 
         already_copied = {}
-        index = 0
+
         for i in dest_manifest["layers"]:
-            layer = process_tar(os.path.join(dest_exploded.name, drop_algo(i["digest"])))
+            layer = process_tar(
+                    os.path.join(dest_exploded.name, drop_algo(i["digest"])))
 
             closest_layer = find_best_matching_layer(src_layers, layer)
 
@@ -95,7 +115,9 @@ def create_delta(src, dest, directory):
             if i in already_copied:
                 continue
             print("Copying %s" % i)
-            shutil.copy(os.path.join(dest_exploded.name, i), os.path.join(directory, i))
+            shutil.copy(os.path.join(
+                dest_exploded.name, i), os.path.join(directory, i))
+
 
 def apply_delta(store, src, diff_dir, out):
     os.mkdir(out)
@@ -106,11 +128,13 @@ def apply_delta(store, src, diff_dir, out):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         src_exploded = tempfile.TemporaryDirectory(dir=tmpdir)
-        print("=======")
-        print(src_exploded.name)
-        print(src)
-        print("=======")
-        exec_cmd(["podman", "push", "--force-compression",  "--compress=false", src, "dir:%s" % src_exploded.name])
+        exec_cmd(
+                ["podman",
+                 "push",
+                 "--force-compression",
+                 "--compress=false",
+                 src,
+                 "dir:%s" % src_exploded.name])
 
         for i in os.listdir(diff_dir):
             if i.find("-") > 0:
@@ -121,7 +145,7 @@ def apply_delta(store, src, diff_dir, out):
                 path = ""
                 for j in json_data:
                     d = j.get("diff-digest")
-                    if d == None:
+                    if d is None:
                         continue
                     if parts[0] == drop_algo(d):
                         path = os.path.join(store, "overlay", j["id"], "diff")
@@ -134,9 +158,12 @@ def apply_delta(store, src, diff_dir, out):
                 print("Copying %s" % i)
                 shutil.copy(os.path.join(diff_dir, i), os.path.join(out, i))
 
+
 def usage():
-    print("Usage: %s diff SRC DEST DIFF_DIR | apply STORE SRC DIFF_DIR OUT" % sys.argv[0])
+    print("Usage: %s diff SRC DEST DIFF_DIR | apply STORE SRC DIFF_DIR OUT"
+          % sys.argv[0])
     sys.exit(1)
+
 
 if len(sys.argv) < 5:
     usage()
@@ -148,7 +175,14 @@ if action == "diff":
 elif action == "apply":
     if len(sys.argv) < 6:
         usage()
-    store, src, diff_dir, out = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+
+    store, src, diff_dir, out = (
+        sys.argv[2],
+        sys.argv[3],
+        sys.argv[4],
+        sys.argv[5]
+    )
+
     apply_delta(store, src, diff_dir, out)
 else:
     print("Unknown command %s" % action)
