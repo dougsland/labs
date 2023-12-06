@@ -8,9 +8,9 @@ This tool uses [podman](https://github.com/containers/podman) and [tardiff](http
 ```
 $ podman pull docker.io/nginx:1.24.0 docker.io/nginx:1.25
 ### create the tardiff under /tmp/diff
-$ ./tardiff-poc.py diff docker.io/nginx:1.24.0 docker.io/nginx:1.25.0 /tmp/diff
+$ ./tardiff-poc diff docker.io/nginx:1.24.0 docker.io/nginx:1.25.0 /tmp/diff
 ### create the tardiff apply the diff from /tmp/diff to the current storage
-$ ./tardiff-poc.py apply ~/.local/share/containers/storage docker.io/nginx:1.24.0 /tmp/diff /tmp/resulting-image
+$ ./tardiff-poc apply ~/.local/share/containers/storage docker.io/nginx:1.24.0 /tmp/diff /tmp/resulting-image
 
 ### try to pull the resulting image from a different user (and empty storage)
 
